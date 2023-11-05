@@ -1,5 +1,10 @@
-use bevy::{pbr::CascadeShadowConfigBuilder, prelude::*};
+use bevy::{
+    pbr::{CascadeShadowConfigBuilder, DirectionalLightShadowMap},
+    prelude::*,
+};
+use bevy_xpbd_3d::prelude::*;
 
+use rand::Rng;
 use std::f32::consts::PI;
 
 const PLAYER_SPEED: f32 = 5.;
@@ -17,8 +22,9 @@ fn main() {
 
     // App
     App::new()
-        .add_plugins(DefaultPlugins)
+        .add_plugins((DefaultPlugins, PhysicsPlugins::default()))
         .insert_resource(ambient_light)
+        .insert_resource(DirectionalLightShadowMap { size: 4096 })
         .add_systems(Startup, setup)
         .add_systems(Update, player_movement)
         .add_systems(Update, camera_movement)
@@ -40,27 +46,40 @@ fn setup(
     });
 
     // Plane
-    commands.spawn(PbrBundle {
-        mesh: meshes.add(shape::Plane::from_size(25.0).into()),
-        material: materials.add(Color::rgb(0.3, 0.5, 0.3).into()),
-        ..default()
-    });
+    commands.spawn((
+        PbrBundle {
+            mesh: meshes.add(shape::Plane::from_size(25.0).into()),
+            material: materials.add(Color::rgb(0.3, 0.5, 0.3).into()),
+            ..default()
+        },
+        RigidBody::Static,
+        Collider::cuboid(25.0, 0.002, 25.0),
+    ));
 
     // Cube
     let cube_translations: [Vec3; 4] = [
-        Vec3::new(5., 0.5, 0.),
-        Vec3::new(-5., 0.5, 0.),
-        Vec3::new(0., 0.5, 5.),
-        Vec3::new(0., 0.5, -5.),
+        Vec3::new(5., 4.5, 0.),
+        Vec3::new(-5., 4.5, 0.),
+        Vec3::new(0., 4.5, 5.),
+        Vec3::new(0., 4.5, -5.),
     ];
 
-    for cube_translation in cube_translations {
-        commands.spawn(PbrBundle {
-            mesh: meshes.add(shape::Cube::default().into()),
-            material: materials.add(Color::rgb(0., 0., 0.).into()),
-            transform: Transform::from_translation(cube_translation),
-            ..default()
-        });
+    for mut cube_translation in cube_translations {
+        let cube_translation_y = rand::thread_rng().gen_range(1..=10) as f32;
+
+        cube_translation.y = cube_translation_y;
+
+        commands.spawn((
+            PbrBundle {
+                mesh: meshes.add(shape::Cube::default().into()),
+                material: materials.add(Color::rgb(0., 0., 0.).into()),
+                transform: Transform::from_translation(cube_translation),
+                ..default()
+            },
+            RigidBody::Dynamic,
+            AngularVelocity(Vec3::new(2.5, 3.4, 1.6)),
+            Collider::cuboid(1.0, 1.0, 1.0),
+        ));
     }
 
     // Player
@@ -71,6 +90,8 @@ fn setup(
             transform: Transform::from_translation(player_translation),
             ..default()
         },
+        RigidBody::Kinematic,
+        Collider::capsule(2., 0.5),
         Player {},
     ));
 
