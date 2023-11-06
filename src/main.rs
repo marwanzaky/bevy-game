@@ -31,8 +31,7 @@ fn main() {
         .insert_resource(ambient_light)
         .insert_resource(DirectionalLightShadowMap { size: 4096 })
         .add_systems(Startup, setup)
-        .add_systems(Update, player_movement)
-        .add_systems(Update, player_gravity)
+        .add_systems(Update, (player_movement, player_gravity))
         .add_systems(Update, camera_movement)
         .run();
 }
@@ -127,7 +126,10 @@ fn camera_movement(
     let player_transform = player_query.get_single().unwrap();
     let mut camera_transform = camera_query.get_single_mut().unwrap();
 
-    camera_transform.translation = player_transform.translation + CAMERA_TRANSLATION;
+    let mut camera_translation: Vec3 = player_transform.translation + CAMERA_TRANSLATION;
+    camera_translation.y = CAMERA_TRANSLATION.y;
+
+    camera_transform.translation = camera_translation;
 }
 
 fn player_gravity(
