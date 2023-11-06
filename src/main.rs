@@ -8,10 +8,15 @@ use rand::Rng;
 use std::f32::consts::PI;
 
 const PLAYER_SPEED: f32 = 5.;
+const PLAYER_GRAVITY: f32 = -9.81;
+const PLAYRE_JUMP_HEIGHT: f32 = 1.;
+
 const CAMERA_TRANSLATION: Vec3 = Vec3::new(0.0, 15.0, 15.0);
 
 #[derive(Component)]
-struct Player {}
+struct Player {
+    velocity: Vec3,
+}
 
 fn main() {
     // Ambient light
@@ -27,6 +32,7 @@ fn main() {
         .insert_resource(DirectionalLightShadowMap { size: 4096 })
         .add_systems(Startup, setup)
         .add_systems(Update, player_movement)
+        .add_systems(Update, player_gravity)
         .add_systems(Update, camera_movement)
         .run();
 }
@@ -36,12 +42,12 @@ fn setup(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    let player_translation: Vec3 = Vec3::new(0., 1., 0.);
+    let player_translation: Vec3 = Vec3::new(0., 10., 0.);
 
     // Camera
     commands.spawn(Camera3dBundle {
         transform: Transform::from_translation(CAMERA_TRANSLATION)
-            .looking_at(player_translation, Vec3::Y),
+            .looking_at(Vec3::new(0., 1., 0.), Vec3::Y),
         ..default()
     });
 
@@ -92,7 +98,9 @@ fn setup(
         },
         RigidBody::Kinematic,
         Collider::capsule(2., 0.5),
-        Player {},
+        Player {
+            velocity: Vec3::ZERO,
+        },
     ));
 
     // Light
@@ -120,6 +128,31 @@ fn camera_movement(
     let mut camera_transform = camera_query.get_single_mut().unwrap();
 
     camera_transform.translation = player_transform.translation + CAMERA_TRANSLATION;
+}
+
+fn player_gravity(
+    time: Res<Time>,
+    keyboard_input: Res<Input<KeyCode>>,
+    mut query: Query<(&mut Transform, &mut Player), With<Player>>,
+) {
+    let (mut player_transform, mut player) = query.get_single_mut().unwrap();
+
+    let grounded_player: bool = player_transform.translation.y <= 1.;
+
+    if grounded_player && player.velocity.y < 0. {
+        player.velocity.y = 0.;
+    }
+
+    if keyboard_input.pressed(KeyCode::Space) && grounded_player {
+        player.velocity.y += (PLAYRE_JUMP_HEIGHT * -3.0 * PLAYER_GRAVITY).sqrt();
+    }
+
+    player.velocity.y += PLAYER_GRAVITY * time.delta_seconds();
+    player_transform.translation.y += player.velocity.y * time.delta_seconds();
+
+    if player_transform.translation.y <= 1. {
+        player_transform.translation.y = 1.;
+    }
 }
 
 fn player_movement(
